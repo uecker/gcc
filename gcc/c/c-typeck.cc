@@ -89,8 +89,8 @@ static int require_constant_elements;
 
 static bool null_pointer_constant_p (const_tree);
 static tree qualify_type (tree, tree);
-static int tagged_types_tu_compatible_p (const_tree, const_tree, bool *,
-					 bool *);
+static int tagged_types_compatible_p (const_tree, const_tree, bool *,
+				      bool *, bool);
 static int comp_target_types (location_t, tree, tree);
 static int function_types_compatible_p (const_tree, const_tree, bool *,
 					bool *);
@@ -1097,8 +1097,8 @@ comptypes_check_different_types (tree type1, tree type2,
    types.  */
 
 static int
-comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
-		    bool *different_types_p)
+comptypes_internal3 (const_tree type1, const_tree type2, bool *enum_and_int_p,
+		    bool *different_types_p, bool tagless)
 {
   const_tree t1 = type1;
   const_tree t2 = type2;
@@ -1256,20 +1256,24 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
     case ENUMERAL_TYPE:
     case RECORD_TYPE:
     case UNION_TYPE:
-      if (val != 1 && !same_translation_unit_p (t1, t2))
+      if (flag_tag_compat)
 	{
 	  tree a1 = TYPE_ATTRIBUTES (t1);
 	  tree a2 = TYPE_ATTRIBUTES (t2);
+
+	  if (ENUMERAL_TYPE != TREE_CODE (t1)
+	      && (TYPE_REVERSE_STORAGE_ORDER (t1)
+		  != TYPE_REVERSE_STORAGE_ORDER (t2)))
+	    return 0;
 
 	  if (! attribute_list_contained (a1, a2)
 	      && ! attribute_list_contained (a2, a1))
 	    break;
 
+	  val = tagged_types_compatible_p (t1, t2, enum_and_int_p,
+					      different_types_p, tagless);
 	  if (attrval != 2)
-	    return tagged_types_tu_compatible_p (t1, t2, enum_and_int_p,
-						 different_types_p);
-	  val = tagged_types_tu_compatible_p (t1, t2, enum_and_int_p,
-					      different_types_p);
+	    return val;
 	}
       break;
 
@@ -1283,6 +1287,14 @@ comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
       break;
     }
   return attrval == 2 && val == 1 ? 2 : val;
+}
+
+
+static int
+comptypes_internal (const_tree type1, const_tree type2, bool *enum_and_int_p,
+		    bool *different_types_p)
+{
+  return comptypes_internal3 (type1, type2, enum_and_int_p, different_types_p, false);
 }
 
 /* Return 1 if TTL and TTR are pointers to types that are equivalent, ignoring
@@ -1344,41 +1356,6 @@ comp_target_types (location_t location, tree ttl, tree ttr)
 
 /* Subroutines of `comptypes'.  */
 
-/* Determine whether two trees derive from the same translation unit.
-   If the CONTEXT chain ends in a null, that tree's context is still
-   being parsed, so if two trees have context chains ending in null,
-   they're in the same translation unit.  */
-
-bool
-same_translation_unit_p (const_tree t1, const_tree t2)
-{
-  while (t1 && TREE_CODE (t1) != TRANSLATION_UNIT_DECL)
-    switch (TREE_CODE_CLASS (TREE_CODE (t1)))
-      {
-      case tcc_declaration:
-	t1 = DECL_CONTEXT (t1); break;
-      case tcc_type:
-	t1 = TYPE_CONTEXT (t1); break;
-      case tcc_exceptional:
-	t1 = BLOCK_SUPERCONTEXT (t1); break;  /* assume block */
-      default: gcc_unreachable ();
-      }
-
-  while (t2 && TREE_CODE (t2) != TRANSLATION_UNIT_DECL)
-    switch (TREE_CODE_CLASS (TREE_CODE (t2)))
-      {
-      case tcc_declaration:
-	t2 = DECL_CONTEXT (t2); break;
-      case tcc_type:
-	t2 = TYPE_CONTEXT (t2); break;
-      case tcc_exceptional:
-	t2 = BLOCK_SUPERCONTEXT (t2); break;  /* assume block */
-      default: gcc_unreachable ();
-      }
-
-  return t1 == t2;
-}
-
 /* Allocate the seen two types, assuming that they are compatible. */
 
 static struct tagged_tu_seen_cache *
@@ -1431,8 +1408,9 @@ free_all_tagged_tu_seen_up_to (const struct tagged_tu_seen_cache *tu_til)
    comptypes_internal.  */
 
 static int
-tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
-			      bool *enum_and_int_p, bool *different_types_p)
+tagged_types_compatible_p (const_tree t1, const_tree t2,
+			   bool *enum_and_int_p, bool *different_types_p,
+			   bool tagless)
 {
   tree s1, s2;
   bool needs_warning = false;
@@ -1453,16 +1431,20 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 	 && DECL_ORIGINAL_TYPE (TYPE_NAME (t2)))
     t2 = DECL_ORIGINAL_TYPE (TYPE_NAME (t2));
 
-  /* C90 didn't have the requirement that the two tags be the same.  */
-  if (flag_isoc99 && TYPE_NAME (t1) != TYPE_NAME (t2))
+  if (TYPE_NAME (t1) != TYPE_NAME (t2))
     return 0;
 
-  /* C90 didn't say what happened if one or both of the types were
-     incomplete; we choose to follow C99 rules here, which is that they
-     are compatible.  */
-  if (TYPE_SIZE (t1) == NULL
-      || TYPE_SIZE (t2) == NULL)
-    return 1;
+  if (flag_tag_compat && !tagless
+      && NULL_TREE == TYPE_NAME (t1))
+     return 0;
+
+  if (TYPE_SIZE (t1) == NULL || TYPE_SIZE (t2) == NULL)
+    return 0;
+
+  if (flag_tag_compat && different_types_p
+      && TYPE_CONTEXT (t1) != TYPE_CONTEXT (t2))
+    *different_types_p = true;
+
 
   {
     const struct tagged_tu_seen_cache * tts_i;
@@ -1479,49 +1461,53 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 	/* Speed up the case where the type values are in the same order.  */
 	tree tv1 = TYPE_VALUES (t1);
 	tree tv2 = TYPE_VALUES (t2);
-
 	if (tv1 == tv2)
 	  {
 	    return 1;
 	  }
 
+#if 1
 	for (;tv1 && tv2; tv1 = TREE_CHAIN (tv1), tv2 = TREE_CHAIN (tv2))
 	  {
 	    if (TREE_PURPOSE (tv1) != TREE_PURPOSE (tv2))
 	      break;
-	    if (simple_cst_equal (TREE_VALUE (tv1), TREE_VALUE (tv2)) != 1)
+#if 1
+	    if (simple_cst_equal (DECL_INITIAL (TREE_VALUE (tv1)), DECL_INITIAL (TREE_VALUE (tv2))) != 1)
 	      {
 		tu->val = 0;
 		return 0;
 	      }
+#endif
 	  }
-
 	if (tv1 == NULL_TREE && tv2 == NULL_TREE)
 	  {
 	    return 1;
 	  }
+#if 1
 	if (tv1 == NULL_TREE || tv2 == NULL_TREE)
 	  {
 	    tu->val = 0;
 	    return 0;
 	  }
-
+#endif
+#endif
+#if 1
 	if (list_length (TYPE_VALUES (t1)) != list_length (TYPE_VALUES (t2)))
 	  {
 	    tu->val = 0;
 	    return 0;
 	  }
-
 	for (s1 = TYPE_VALUES (t1); s1; s1 = TREE_CHAIN (s1))
 	  {
 	    s2 = purpose_member (TREE_PURPOSE (s1), TYPE_VALUES (t2));
 	    if (s2 == NULL
-		|| simple_cst_equal (TREE_VALUE (s1), TREE_VALUE (s2)) != 1)
+	        || simple_cst_equal (DECL_INITIAL (TREE_VALUE (s1)), DECL_INITIAL (TREE_VALUE (s2))) != 1)
 	      {
 		tu->val = 0;
 		return 0;
 	      }
 	  }
+#endif
 	return 1;
       }
 
@@ -1606,13 +1592,19 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 		return 0;
 	      }
 	  }
-	tu->val = needs_warning ? 2 : 10;
+	tu->val = needs_warning ? 2 : 1;
 	return tu->val;
       }
 
     case RECORD_TYPE:
       {
 	struct tagged_tu_seen_cache *tu = alloc_tagged_tu_seen_cache (t1, t2);
+
+	if (list_length (TYPE_FIELDS (t1)) != list_length (TYPE_FIELDS (t2)))
+	  {
+	    tu->val = 0;
+	    return 0;
+	  }
 
 	for (s1 = TYPE_FIELDS (t1), s2 = TYPE_FIELDS (t2);
 	     s1 && s2;
@@ -1622,8 +1614,12 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 	    if (TREE_CODE (s1) != TREE_CODE (s2)
 		|| DECL_NAME (s1) != DECL_NAME (s2))
 	      break;
-	    result = comptypes_internal (TREE_TYPE (s1), TREE_TYPE (s2),
-					 enum_and_int_p, different_types_p);
+
+	    bool tagless = !DECL_NAME (s1);
+
+	    result = comptypes_internal3 (TREE_TYPE (s1), TREE_TYPE (s2),
+					  enum_and_int_p, different_types_p,
+					  tagless);
 	    if (result == 0)
 	      break;
 	    if (result == 2)
@@ -7059,10 +7055,12 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 
   /* Aggregates in different TUs might need conversion.  */
   if ((codel == RECORD_TYPE || codel == UNION_TYPE)
-      && codel == coder
-      && comptypes (type, rhstype))
-    return convert_and_check (expr_loc != UNKNOWN_LOCATION
+      && codel == coder)
+    {
+      if (comptypes (TYPE_MAIN_VARIANT (type), TYPE_MAIN_VARIANT (rhstype)))
+	return convert_and_check (expr_loc != UNKNOWN_LOCATION
 			      ? expr_loc : location, type, rhs);
+    }
 
   /* Conversion to a transparent union or record from its member types.
      This applies only to function arguments.  */
@@ -8171,6 +8169,15 @@ digest_init (location_t init_loc, tree type, tree init, tree origtype,
 	/* Although the types are compatible, we may require a
 	   conversion.  */
 	inside_init = convert (type, inside_init);
+
+      if (code == RECORD_TYPE || code == UNION_TYPE)
+	{
+	  if (!comptypes (TYPE_MAIN_VARIANT (type), TYPE_MAIN_VARIANT (TREE_TYPE (inside_init))))
+	    {
+	      error_init (init_loc, "invalid initializer %qT %qT", type, TREE_TYPE (inside_init));
+	      return error_mark_node;
+	    }
+	}
 
       if (require_constant
 	  && TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR)
@@ -10203,7 +10210,7 @@ initialize_elementwise_p (tree type, tree value)
     return !VECTOR_TYPE_P (value_type);
 
   if (AGGREGATE_TYPE_P (type))
-    return type != TYPE_MAIN_VARIANT (value_type);
+      return !comptypes (type, TYPE_MAIN_VARIANT (value_type));
 
   return false;
 }

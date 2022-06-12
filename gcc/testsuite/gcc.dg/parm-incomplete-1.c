@@ -6,7 +6,7 @@
    C99 6.7.5.3); the precise rules are unclear.  */
 /* Origin: Joseph Myers <jsm@polyomino.org.uk> */
 /* { dg-do compile } */
-/* { dg-options "" } */
+/* { dg-options "-fno-tag-compat" } */
 
 struct s;
 void f (struct s);

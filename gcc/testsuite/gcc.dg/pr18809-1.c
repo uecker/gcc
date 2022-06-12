@@ -1,6 +1,7 @@
 /* PR c/18809 */
 /* Origin: Andrew Pinski <pinskia@gcc.gnu.org> */
 
+/* { dg-options "-pedantic-errors -fno-tag-compat" } */
 /* { dg-do compile } */
 
 void foo(enum E e) {}   /* { dg-error "forward ref" "forward" } */

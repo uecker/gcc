@@ -2,7 +2,7 @@
    not match one declared in an outer scope.  */
 /* Origin: Joseph Myers <jsm@polyomino.org.uk> */
 /* { dg-do compile } */
-/* { dg-options "-std=iso9899:1999 -pedantic-errors" } */
+/* { dg-options "-std=iso9899:1999 -pedantic-errors -fno-tag-compat" } */
 
 struct s;
 struct t { struct s *p; } x;

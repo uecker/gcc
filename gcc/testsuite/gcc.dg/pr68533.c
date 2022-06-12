@@ -1,6 +1,6 @@
 /* PR c/68533 */
 /* { dg-do compile } */
-/* { dg-options "" } */
+/* { dg-options "-fno-tag-compat" } */
 
 struct T { int t; };
 

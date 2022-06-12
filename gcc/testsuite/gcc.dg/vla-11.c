@@ -4,7 +4,7 @@
    these cases).  */
 /* Origin: Joseph Myers <joseph@codesourcery.com> */
 /* { dg-do compile } */
-/* { dg-options "-std=c99 -pedantic-errors" } */
+/* { dg-options "-std=c99 -pedantic-errors -fno-tag-compat" } */
 
 void foo11a(int x[sizeof(int *(*)[*])]);	/* { dg-warning "not in a declaration" } */
 void foo11b(__SIZE_TYPE__ x, int y[(__UINTPTR_TYPE__)(int (*)[*])x]);	/* { dg-warning "not in a declaration" } */

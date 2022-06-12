@@ -1,7 +1,7 @@
 /* Test for handling of tags (6.7.2.3).  */
 /* Origin: Joseph Myers <jsm28@cam.ac.uk> */
 /* { dg-do compile } */
-/* { dg-options "-std=iso9899:1999 -pedantic-errors" } */
+/* { dg-options "-std=iso9899:1999 -pedantic-errors -fno-tag-compat" } */
 
 void
 foo (void)

@@ -1,6 +1,6 @@
 /* PR101838 */
 /* { dg-do run } */
-/* { dg-options "-Wpedantic -O0" } */
+/* { dg-options "-Wpedantic -O0 -fno-tag-compat" } */
 /* { dg-require-effective-target alloca } */
 
 

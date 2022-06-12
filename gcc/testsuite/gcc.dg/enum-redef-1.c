@@ -1,3 +1,5 @@
+/* { dg-options "-fno-tag-compat" } */
+
 enum a { A };
 enum a { B }; /* { dg-bogus "nested redefinition" } */
 /* { dg-error "redeclaration of 'enum a'" "" { target *-*-* } .-1 } */

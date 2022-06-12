@@ -3231,7 +3231,7 @@ c_parser_enum_specifier (c_parser *parser)
 	    }
 	  else
 	    enum_value = NULL_TREE;
-	  enum_decl = build_enumerator (decl_loc, value_loc,
+	  enum_decl = build_enumerator (decl_loc, value_loc, type,
 					&the_enum, enum_id, enum_value);
 	  if (enum_attrs)
 	    decl_attributes (&TREE_PURPOSE (enum_decl), enum_attrs, 0);

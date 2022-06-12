@@ -1,4 +1,5 @@
 /* PR c/27953 */
+/* { dg-options "-fno-tag-compat" } */
 
 void foo(struct A a) {} /* { dg-line foo_first } */
 /* { dg-warning "declared inside parameter list" "inside" { target *-*-* } .-1 } */

@@ -2108,6 +2108,9 @@ Enum(strong_eval_order) String(some) Value(1)
 EnumValue
 Enum(strong_eval_order) String(all) Value(2)
 
+ftag-compat
+C Var(flag_tag_compat) Init(1)
+
 ftemplate-backtrace-limit=
 C++ ObjC++ Joined RejectNegative UInteger Var(template_backtrace_limit) Init(10)
 Set the maximum number of template instantiation notes for a single warning or error.

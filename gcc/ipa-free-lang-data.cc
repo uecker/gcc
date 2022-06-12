@@ -254,8 +254,9 @@ fld_incomplete_type_of (tree t, class free_lang_data_d *fld)
 	  else
 	    first = build_reference_type_for_mode (t2, TYPE_MODE (t),
 						   TYPE_REF_CAN_ALIAS_ALL (t));
-	  gcc_assert (TYPE_CANONICAL (t2) != t2
-		      && TYPE_CANONICAL (t2) == TYPE_CANONICAL (TREE_TYPE (t)));
+	  gcc_assert (flag_tag_compat
+		      || (TYPE_CANONICAL (t2) != t2
+			  && TYPE_CANONICAL (t2) == TYPE_CANONICAL (TREE_TYPE (t))));
 	  if (!fld->pset.add (first))
 	    add_tree_to_fld_list (first, fld);
 	  return fld_type_variant (first, t, fld);

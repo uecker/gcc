@@ -599,6 +599,10 @@ public:
   auto_vec<tree> typedefs_seen;
 };
 
+
+/* All tagged typed so that TYPE_CANONICAL can be set correctly.  */
+static auto_vec<tree> all_structs;
+
 /* Information for the struct or union currently being parsed, or
    NULL if not parsing a struct or union.  */
 static class c_struct_parse_info *struct_parse_info;
@@ -1354,8 +1358,8 @@ pop_scope (void)
 	      BLOCK_VARS (block) = extp;
 	    }
 	  /* If this is the file scope set DECL_CONTEXT of each decl to
-	     the TRANSLATION_UNIT_DECL.  This makes same_translation_unit_p
-	     work.  */
+	     the TRANSLATION_UNIT_DECL.  */
+
 	  if (scope == file_scope)
 	    {
 	      DECL_CONTEXT (p) = context;
@@ -1985,9 +1989,32 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
      given scope.  */
   if (TREE_CODE (olddecl) == CONST_DECL)
     {
-      auto_diagnostic_group d;
-      error ("redeclaration of enumerator %q+D", newdecl);
-      locate_old_decl (olddecl);
+      if (flag_tag_compat) // && comptypes (TREE_TYPE (DECL_INITIAL (olddecl)), TREE_TYPE (DECL_INITIAL (newdecl))))
+	{
+	   struct c_binding *b = NULL;
+           tree name = TYPE_NAME (TREE_TYPE (olddecl));
+
+           if (name)
+	     b = I_TAG_BINDING (name);
+
+           if (b)
+	     b = b->shadowed;
+
+	   if (!(COMPLETE_TYPE_P (TREE_TYPE (olddecl))
+                 && b && B_IN_CURRENT_SCOPE (b)
+	         && simple_cst_equal (DECL_INITIAL (olddecl), DECL_INITIAL (newdecl))))
+	    {
+	      auto_diagnostic_group d;
+	      error ("conflicting redeclaration of enumerator %q+D", newdecl);
+	      locate_old_decl (olddecl);
+	    }
+	}
+      else
+	{
+	  auto_diagnostic_group d;
+	  error ("redeclaration of enumerator %q+D", newdecl);
+	  locate_old_decl (olddecl);
+	}
       return false;
     }
 
@@ -2238,7 +2265,7 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 		 isn't overriding an extern inline reject the new decl.
 		 In c99, no overriding is allowed in the same translation
 		 unit.  */
-	      if ((!DECL_EXTERN_INLINE (olddecl)
+	      if (!DECL_EXTERN_INLINE (olddecl)
 		   || DECL_EXTERN_INLINE (newdecl)
 		   || (!flag_gnu89_inline
 		       && (!DECL_DECLARED_INLINE_P (olddecl)
@@ -2248,7 +2275,6 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 			   || !lookup_attribute ("gnu_inline",
 						 DECL_ATTRIBUTES (newdecl))))
 		  )
-		  && same_translation_unit_p (newdecl, olddecl))
 		{
 		  auto_diagnostic_group d;
 		  error ("redefinition of %q+D", newdecl);
@@ -3267,18 +3293,11 @@ pushdecl (tree x)
 	 type to the composite of all the types of that declaration.
 	 After the consistency checks, it will be reset to the
 	 composite of the visible types only.  */
-      if (b && (TREE_PUBLIC (x) || same_translation_unit_p (x, b->decl))
-	  && b->u.type)
+      if (b && b->u.type)
 	TREE_TYPE (b->decl) = b->u.type;
 
-      /* The point of the same_translation_unit_p check here is,
-	 we want to detect a duplicate decl for a construct like
-	 foo() { extern bar(); } ... static bar();  but not if
-	 they are in different translation units.  In any case,
-	 the static does not go in the externals scope.  */
-      if (b
-	  && (TREE_PUBLIC (x) || same_translation_unit_p (x, b->decl))
-	  && duplicate_decls (x, b->decl))
+      /* The static does not go in the externals scope.  */
+      if (b && duplicate_decls (x, b->decl))
 	{
 	  tree thistype;
 	  if (vistype)
@@ -8088,7 +8107,8 @@ get_parm_info (bool ellipsis, tree expr)
 	     (it's impossible to call such a function with type-
 	     correct arguments).  An anonymous union parm type is
 	     meaningful as a GNU extension, so don't warn for that.  */
-	  if (TREE_CODE (decl) != UNION_TYPE || b->id != NULL_TREE)
+	  if (!flag_tag_compat
+	      && (TREE_CODE (decl) != UNION_TYPE || b->id != NULL_TREE))
 	    {
 	      if (b->id)
 		/* The %s will be one of 'struct', 'union', or 'enum'.  */
@@ -8288,6 +8308,12 @@ start_struct (location_t loc, enum tree_code code, tree name,
 
   if (name != NULL_TREE)
     ref = lookup_tag (code, name, true, &refloc);
+
+  /* If we already have a completed definition, then
+     do not use it. We will check for consistency later */
+  if (flag_tag_compat && ref && TYPE_SIZE (ref))
+    ref = NULL_TREE;
+
   if (ref && TREE_CODE (ref) == code)
     {
       if (TYPE_STUB_DECL (ref))
@@ -8977,6 +9003,58 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
       warning_at (loc, 0, "union cannot be made transparent");
     }
 
+  /* Check for consistency with previous definition */
+  if (flag_tag_compat)
+    {
+      struct c_binding *b = NULL;
+      tree name = TYPE_NAME (t);
+
+      if (name)
+	b = I_TAG_BINDING (name);
+
+      if (b)
+	b = b->shadowed;
+
+      if (b && B_IN_CURRENT_SCOPE (b))
+	{
+	  tree vistype = b->decl;
+	  bool different_types = false;
+
+	  if (!C_TYPE_BEING_DEFINED (vistype)
+	      && ((1 != comptypes_check_different_types(t, vistype, &different_types))
+		 || different_types))
+	    error ("redefinition of struct or union %qT", vistype);
+	}
+    }
+
+  C_TYPE_BEING_DEFINED (t) = 0;
+
+  if (flag_tag_compat)
+    {
+      gcc_assert (t == TYPE_MAIN_VARIANT (t));
+      /* We treat structs with variable size as
+	 incompatible with other structs.  */
+      if (C_TYPE_VARIABLE_SIZE (t))
+	TYPE_CANONICAL (t) = t;
+      else
+	{
+	  unsigned int i;
+	  tree t2 = NULL_TREE;
+	   FOR_EACH_VEC_ELT (all_structs, i, t2)
+	  if (comptypes (t, t2))
+	    break;
+
+	  if (t2 != NULL_TREE)
+	    TYPE_CANONICAL (t) = t2;
+	  else
+	    {
+	      TYPE_CANONICAL (t) = t;
+	      all_structs.safe_push (t);
+	    }
+	 }
+    }
+
+
   tree incomplete_vars = C_TYPE_INCOMPLETE_VARS (TYPE_MAIN_VARIANT (t));
   for (x = TYPE_MAIN_VARIANT (t); x; x = TYPE_NEXT_VARIANT (x))
     {
@@ -8987,12 +9065,14 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
       C_TYPE_FIELDS_VOLATILE (x) = C_TYPE_FIELDS_VOLATILE (t);
       C_TYPE_VARIABLE_SIZE (x) = C_TYPE_VARIABLE_SIZE (t);
       C_TYPE_INCOMPLETE_VARS (x) = NULL_TREE;
+      TYPE_CANONICAL (x) = TYPE_CANONICAL (t);
     }
 
   /* Update type location to the one of the definition, instead of e.g.
      a forward declaration.  */
   if (TYPE_STUB_DECL (t))
     DECL_SOURCE_LOCATION (TYPE_STUB_DECL (t)) = loc;
+
 
   /* Finish debugging output for this type.  */
   rest_of_type_compilation (t, toplevel);
@@ -9019,6 +9099,7 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
       && struct_parse_info != NULL
       && !in_sizeof && !in_typeof && !in_alignof)
     struct_parse_info->struct_types.safe_push (t);
+
 
   return t;
 }
@@ -9100,9 +9181,15 @@ start_enum (location_t loc, struct c_enum_contents *the_enum, tree name)
   if (name != NULL_TREE)
     enumtype = lookup_tag (ENUMERAL_TYPE, name, true, &enumloc);
 
+  if (flag_tag_compat && enumtype != NULL_TREE
+      && TREE_CODE (enumtype) == ENUMERAL_TYPE
+      && TYPE_VALUES (enumtype) != NULL_TREE)
+    enumtype = NULL_TREE;
+
   if (enumtype == NULL_TREE || TREE_CODE (enumtype) != ENUMERAL_TYPE)
     {
       enumtype = make_node (ENUMERAL_TYPE);
+      TYPE_SIZE (enumtype) = NULL_TREE;
       pushtag (loc, name, enumtype);
     }
   /* Update type location to the one of the definition, instead of e.g.
@@ -9309,6 +9396,31 @@ finish_enum (tree enumtype, tree values, tree attributes)
       && !in_sizeof && !in_typeof && !in_alignof)
     struct_parse_info->struct_types.safe_push (enumtype);
 
+
+  /* Check for consistency with previous definition */
+
+  if (flag_tag_compat)
+    {
+      struct c_binding *b = NULL;
+      tree name = TYPE_NAME (enumtype);
+
+      if (name)
+	b = I_TAG_BINDING (name);
+
+      if (b)
+	b = b->shadowed;
+
+      if (b && B_IN_CURRENT_SCOPE (b))
+	{
+	  tree vistype = b->decl;
+	  bool different_types = false;
+
+	  if ((1 != comptypes_check_different_types(enumtype, vistype, &different_types))
+	      || different_types)
+	       error("conflicting redefinition of enum %qT", vistype);
+	}
+    }
+
   C_TYPE_BEING_DEFINED (enumtype) = 0;
 
   return enumtype;
@@ -9322,7 +9434,7 @@ finish_enum (tree enumtype, tree values, tree attributes)
    Assignment of sequential values by default is handled here.  */
 
 tree
-build_enumerator (location_t decl_loc, location_t loc,
+build_enumerator (location_t decl_loc, location_t loc, tree enumtype,
 		  struct c_enum_contents *the_enum, tree name, tree value)
 {
   tree decl, type;
@@ -9409,7 +9521,7 @@ build_enumerator (location_t decl_loc, location_t loc,
 				  >= TYPE_PRECISION (integer_type_node)
 				  && TYPE_UNSIGNED (type)));
 
-  decl = build_decl (decl_loc, CONST_DECL, name, type);
+  decl = build_decl (decl_loc, CONST_DECL, name, enumtype);
   DECL_INITIAL (decl) = convert (type, value);
   pushdecl (decl);
 
@@ -9434,7 +9546,7 @@ c_simulate_enum_decl (location_t loc, const char *name,
   unsigned int i;
   FOR_EACH_VEC_ELT (values, i, value)
     {
-      tree decl = build_enumerator (loc, loc, &the_enum,
+      tree decl = build_enumerator (loc, loc, enumtype, &the_enum,
 				    get_identifier (value->first),
 				    build_int_cst (integer_type_node,
 						   value->second));

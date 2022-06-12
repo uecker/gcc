@@ -2833,6 +2833,11 @@ the target (the default).  This option is not supported for C++.
 @strong{Warning:} the @option{-fsso-struct} switch causes GCC to generate
 code that is not binary compatible with code generated without it if the
 specified endianness is not the native endianness of the target.
+
+@item -ftag-compat
+@opindex ftag-compat
+This option makes tagged types that are structurally equivalent compatible
+and allows identical redeclarations of tagged types in the same scope.
 @end table
 
 @node C++ Dialect Options

@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2" } */
+/* { dg-options "-O2 -fno-tag-compat" } */
 
 struct color { int i; }; /* { dg-message "note: originally defined here" } */
 static const struct color col;
