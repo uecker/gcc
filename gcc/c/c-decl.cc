@@ -1155,16 +1155,6 @@ update_label_decls (struct c_scope *scope)
     }
 }
 
-/* Set the TYPE_CONTEXT of all of TYPE's variants to CONTEXT.  */
-
-static void
-set_type_context (tree type, tree context)
-{
-  for (type = TYPE_MAIN_VARIANT (type); type;
-       type = TYPE_NEXT_VARIANT (type))
-    TYPE_CONTEXT (type) = context;
-}
-
 /* Exit a scope.  Restore the state of the identifier-decl mappings
    that were in effect when this scope was entered.  Return a BLOCK
    node containing all the DECLs in this scope that are of interest
@@ -1253,7 +1243,6 @@ pop_scope (void)
 	case ENUMERAL_TYPE:
 	case UNION_TYPE:
 	case RECORD_TYPE:
-	  set_type_context (p, context);
 
 	  /* Types may not have tag-names, in which case the type
 	     appears in the bindings list with b->id NULL.  */
@@ -1364,12 +1353,7 @@ pop_scope (void)
 	     the TRANSLATION_UNIT_DECL.  This makes same_translation_unit_p
 	     work.  */
 	  if (scope == file_scope)
-	    {
 	      DECL_CONTEXT (p) = context;
-	      if (TREE_CODE (p) == TYPE_DECL
-		  && TREE_TYPE (p) != error_mark_node)
-		set_type_context (TREE_TYPE (p), context);
-	    }
 
 	  gcc_fallthrough ();
 	  /* Parameters go in DECL_ARGUMENTS, not BLOCK_VARS, and have
