@@ -2311,21 +2311,18 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 	{
 	  if (DECL_INITIAL (olddecl))
 	    {
-	      /* If both decls are in the same TU and the new declaration
-		 isn't overriding an extern inline reject the new decl.
-		 In c99, no overriding is allowed in the same translation
-		 unit.  */
-	      if ((!DECL_EXTERN_INLINE (olddecl)
-		   || DECL_EXTERN_INLINE (newdecl)
-		   || (!flag_gnu89_inline
-		       && (!DECL_DECLARED_INLINE_P (olddecl)
-			   || !lookup_attribute ("gnu_inline",
-						 DECL_ATTRIBUTES (olddecl)))
-		       && (!DECL_DECLARED_INLINE_P (newdecl)
-			   || !lookup_attribute ("gnu_inline",
-						 DECL_ATTRIBUTES (newdecl))))
-		  )
-		  && same_translation_unit_p (newdecl, olddecl))
+	      /* If the new declaration isn't overriding an extern inline
+		 reject the new decl. In c99, no overriding is allowed
+		 in the same translation unit.  */
+	      if (!DECL_EXTERN_INLINE (olddecl)
+		  || DECL_EXTERN_INLINE (newdecl)
+		  || (!flag_gnu89_inline
+		      && (!DECL_DECLARED_INLINE_P (olddecl)
+			  || !lookup_attribute ("gnu_inline",
+						DECL_ATTRIBUTES (olddecl)))
+		      && (!DECL_DECLARED_INLINE_P (newdecl)
+			  || !lookup_attribute ("gnu_inline",
+						DECL_ATTRIBUTES (newdecl)))))
 		{
 		  auto_diagnostic_group d;
 		  error ("redefinition of %q+D", newdecl);
@@ -3353,18 +3350,11 @@ pushdecl (tree x)
 	 type to the composite of all the types of that declaration.
 	 After the consistency checks, it will be reset to the
 	 composite of the visible types only.  */
-      if (b && (TREE_PUBLIC (x) || same_translation_unit_p (x, b->decl))
-	  && b->u.type)
+      if (b && b->u.type)
 	TREE_TYPE (b->decl) = b->u.type;
 
-      /* The point of the same_translation_unit_p check here is,
-	 we want to detect a duplicate decl for a construct like
-	 foo() { extern bar(); } ... static bar();  but not if
-	 they are in different translation units.  In any case,
-	 the static does not go in the externals scope.  */
-      if (b
-	  && (TREE_PUBLIC (x) || same_translation_unit_p (x, b->decl))
-	  && duplicate_decls (x, b->decl))
+      /* the static does not go in the externals scope.  */
+      if (b && duplicate_decls (x, b->decl))
 	{
 	  tree thistype;
 	  if (vistype)
