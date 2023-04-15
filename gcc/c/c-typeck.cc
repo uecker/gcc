@@ -93,6 +93,7 @@ static tree qualify_type (tree, tree);
 struct comptypes_data;
 static int tagged_types_compatible_p (const_tree, const_tree, struct comptypes_data *);
 static int comp_target_types (location_t, tree, tree);
+static int comp_target_types_instr (location_t, tree, tree, tree *);
 static int function_types_compatible_p (const_tree, const_tree, struct comptypes_data *);
 static int type_lists_compatible_p (const_tree, const_tree, struct comptypes_data *);
 static tree lookup_field (tree, tree);
@@ -1061,6 +1062,9 @@ struct comptypes_data {
 
   bool enum_and_int_p;
   bool different_types_p;
+
+  location_t loc;
+  tree instrument_expr;
 };
 
 /* Return 1 if TYPE1 and TYPE2 are compatible types for assignment
@@ -1083,18 +1087,33 @@ comptypes (tree type1, tree type2)
 /* Like comptypes, but if it returns non-zero because enum and int are
    compatible, it sets *ENUM_AND_INT_P to true.  */
 
-int
-comptypes_check_enum_int (tree type1, tree type2, bool *enum_and_int_p)
+static int
+comptypes_check_enum_int_instr (tree type1, tree type2, bool *enum_and_int_p, location_t loc, tree *instrument_expr)
 {
   int val;
 
   struct comptypes_data data = { };
+
+  data.loc = loc;
+
+  if (NULL != instrument_expr)
+    data.instrument_expr = void_node;
+
   val = comptypes_internal (type1, type2, &data);
   *enum_and_int_p = data.enum_and_int_p;
+
+  if (NULL != instrument_expr)
+    *instrument_expr = data.instrument_expr;
 
   free_all_tagged_seen (data.seen_base);
 
   return val;
+}
+
+int
+comptypes_check_enum_int (tree type1, tree type2, bool *enum_and_int_p)
+{
+  return comptypes_check_enum_int_instr (type1, type2, enum_and_int_p, UNKNOWN_LOCATION, NULL);
 }
 
 /* Like comptypes, but if it returns nonzero for different types, it
@@ -1265,7 +1284,18 @@ comptypes_internal (const_tree type1, const_tree type2,
 	if (d1_variable != d2_variable)
 	  data->different_types_p = true;
 	if (d1_variable || d2_variable)
-	  break;
+	  {
+	    if (NULL != data->instrument_expr)
+	      {
+		tree instrument_expr2 = ubsan_instrument_vm_assign (data->loc,
+								    TYPE_MAIN_VARIANT (t2),
+								    TYPE_MAIN_VARIANT (t1));
+		/* chain into series of COMPOUND_EXPR */
+		data->instrument_expr = fold_build2 (COMPOUND_EXPR, void_type_node,
+						     instrument_expr2, data->instrument_expr);
+	      }
+	    break;
+	  }
 	if (d1_zero && d2_zero)
 	  break;
 	if (d1_zero || d2_zero
@@ -1312,7 +1342,7 @@ comptypes_internal (const_tree type1, const_tree type2,
    subset of the other.  */
 
 static int
-comp_target_types (location_t location, tree ttl, tree ttr)
+comp_target_types_instr (location_t location, tree ttl, tree ttr, tree *instrument_expr)
 {
   int val;
   int val_ped;
@@ -1346,8 +1376,7 @@ comp_target_types (location_t location, tree ttl, tree ttr)
 	 ? c_build_qualified_type (TYPE_MAIN_VARIANT (mvr), TYPE_QUAL_ATOMIC)
 	 : TYPE_MAIN_VARIANT (mvr));
 
-  enum_and_int_p = false;
-  val = comptypes_check_enum_int (mvl, mvr, &enum_and_int_p);
+  val = comptypes_check_enum_int_instr (mvl, mvr, &enum_and_int_p, location, instrument_expr);
 
   if (val == 1 && val_ped != 1)
     pedwarn_c11 (location, OPT_Wpedantic, "invalid use of pointers to arrays with different qualifiers "
@@ -1362,6 +1391,13 @@ comp_target_types (location_t location, tree ttl, tree ttr)
 
   return val;
 }
+
+static int
+comp_target_types (location_t location, tree ttl, tree ttr)
+{
+  return comp_target_types_instr (location, ttl, ttr, NULL);
+}
+
 
 /* Subroutines of `comptypes'.  */
 
@@ -1412,7 +1448,7 @@ free_all_tagged_seen (const struct tagged_seen_cache *cache)
 
 static int
 tagged_types_compatible_p (const_tree t1, const_tree t2,
-			      struct comptypes_data* data)
+			   struct comptypes_data* data)
 {
   tree s1, s2;
   bool needs_warning = false;
@@ -7091,6 +7127,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
   if (coder == POINTER_TYPE && reject_gcc_builtin (rhs))
     return error_mark_node;
 
+
   /* A non-reference type can convert to a reference.  This handles
      va_start, va_copy and possibly port built-ins.  */
   if (codel == REFERENCE_TYPE && coder != REFERENCE_TYPE)
@@ -7295,6 +7332,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       int target_cmp = 0;   /* Cache comp_target_types () result.  */
       addr_space_t asl;
       addr_space_t asr;
+      tree instrument_expr = NULL;
 
       if (TREE_CODE (mvl) != ARRAY_TYPE)
 	mvl = (TYPE_ATOMIC (mvl)
@@ -7489,12 +7527,17 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	  }
 	}
 
+      bool instrument_p = sanitize_flags_p (SANITIZE_VLA)
+			  && (ic_init_const != errtype)
+			  && (ic_argpass != errtype);
+
       /* Any non-function converts to a [const][volatile] void *
 	 and vice versa; otherwise, targets must be the same.
 	 Meanwhile, the lhs target must have all the qualifiers of the rhs.  */
       if ((VOID_TYPE_P (ttl) && !TYPE_ATOMIC (ttl))
 	  || (VOID_TYPE_P (ttr) && !TYPE_ATOMIC (ttr))
-	  || (target_cmp = comp_target_types (location, type, rhstype))
+	  || (target_cmp = comp_target_types_instr (location, type, rhstype,
+						    instrument_p ? &instrument_expr : NULL))
 	  || is_opaque_pointer
 	  || ((c_common_unsigned_type (mvl)
 	       == c_common_unsigned_type (mvr))
@@ -7694,6 +7737,15 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       /* If RHS isn't an address, check pointer or array of packed
 	 struct or union.  */
       warn_for_address_or_pointer_of_packed_member (type, orig_rhs);
+
+      if (instrument_expr != NULL)
+      {
+	/* We have to make sure that the rhs is evaluated first,
+	   because we may use size expressions in it to check bounds.  */
+	rhs = save_expr (rhs);
+	instrument_expr = fold_build2 (COMPOUND_EXPR, void_type_node, rhs, instrument_expr);
+	rhs = fold_build2 (COMPOUND_EXPR, TREE_TYPE (rhs), instrument_expr, rhs);
+      }
 
       return convert (type, rhs);
     }
