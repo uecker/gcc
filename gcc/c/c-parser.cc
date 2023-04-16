@@ -9255,30 +9255,59 @@ c_parser_generic_selection (c_parser *parser)
   if (!parens.require_open (parser))
     return error_expr;
 
-  c_inhibit_evaluation_warnings++;
   selector_loc = c_parser_peek_token (parser)->location;
-  selector = c_parser_expr_no_commas (parser, NULL);
-  selector = default_function_array_conversion (selector_loc, selector);
-  c_inhibit_evaluation_warnings--;
-
-  if (selector.value == error_mark_node)
+  if (c_parser_next_tokens_start_typename (parser, cla_prefer_id))
     {
-      c_parser_skip_until_found (parser, CPP_CLOSE_PAREN, NULL);
-      return selector;
+      struct c_typespec ret;
+      ret.kind = ctsk_typeof;
+      ret.spec = error_mark_node;
+      ret.expr = NULL_TREE;
+      ret.expr_const_operands = true;
+      ret.has_enum_type_specifier = false;
+
+      in_typeof++;
+      c_inhibit_evaluation_warnings++;
+      struct c_type_name *type = c_parser_type_name (parser);
+      c_inhibit_evaluation_warnings--;
+      in_typeof--;
+
+      if (type == NULL)
+	{
+	  c_parser_skip_until_found (parser, CPP_CLOSE_PAREN, NULL);
+	  return error_expr;
+	}
+
+      ret.spec = groktypename (type, &ret.expr, &ret.expr_const_operands);
+      pop_maybe_used (c_type_variably_modified_p (ret.spec));
+      selector_type = ret.spec;
     }
-  mark_exp_read (selector.value);
-  selector_type = TREE_TYPE (selector.value);
-  /* In ISO C terms, rvalues (including the controlling expression of
-     _Generic) do not have qualified types.  */
-  if (TREE_CODE (selector_type) != ARRAY_TYPE)
-    selector_type = TYPE_MAIN_VARIANT (selector_type);
-  /* In ISO C terms, _Noreturn is not part of the type of expressions
-     such as &abort, but in GCC it is represented internally as a type
-     qualifier.  */
-  if (FUNCTION_POINTER_TYPE_P (selector_type)
-      && TYPE_QUALS (TREE_TYPE (selector_type)) != TYPE_UNQUALIFIED)
-    selector_type
-      = build_pointer_type (TYPE_MAIN_VARIANT (TREE_TYPE (selector_type)));
+  else
+    {
+      c_inhibit_evaluation_warnings++;
+      selector = c_parser_expr_no_commas (parser, NULL);
+      selector = default_function_array_conversion (selector_loc, selector);
+      c_inhibit_evaluation_warnings--;
+
+      if (selector.value == error_mark_node)
+	{
+	  c_parser_skip_until_found (parser, CPP_CLOSE_PAREN, NULL);
+	  return selector;
+	}
+
+      mark_exp_read (selector.value);
+      selector_type = TREE_TYPE (selector.value);
+      /* In ISO C terms, rvalues (including the controlling expression of
+	 _Generic) do not have qualified types.  */
+      if (TREE_CODE (selector_type) != ARRAY_TYPE)
+	selector_type = TYPE_MAIN_VARIANT (selector_type);
+      /* In ISO C terms, _Noreturn is not part of the type of expressions
+	 such as &abort, but in GCC it is represented internally as a type
+	 qualifier.  */
+      if (FUNCTION_POINTER_TYPE_P (selector_type)
+	  && TYPE_QUALS (TREE_TYPE (selector_type)) != TYPE_UNQUALIFIED)
+      selector_type
+	= build_pointer_type (TYPE_MAIN_VARIANT (TREE_TYPE (selector_type)));
+    }
 
   if (!c_parser_require (parser, CPP_COMMA, "expected %<,%>"))
     {
