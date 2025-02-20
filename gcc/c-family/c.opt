@@ -525,7 +525,7 @@ C ObjC C++ ObjC++ Var(warn_cast_function_type) Warning EnabledBy(Wextra)
 Warn about casts between incompatible function types.
 
 Wcast-qual
-C ObjC C++ ObjC++ Var(warn_cast_qual) Warning
+C ObjC C++ ObjC++ Var(warn_cast_qual) Warning LangEnabledBy(C, Wsafety=)
 Warn about casts which discard qualifiers.
 
 Wcast-user-defined
@@ -937,7 +937,7 @@ C ObjC C++ ObjC++ CPP(cpp_warn_invalid_utf8) CppReason(CPP_W_INVALID_UTF8) Var(w
 Warn about invalid UTF-8 characters.
 
 Wjump-misses-init
-C ObjC Var(warn_jump_misses_init) Warning LangEnabledby(C ObjC,Wc++-compat)
+C ObjC Var(warn_jump_misses_init) Warning LangEnabledBy(C ObjC,Wc++-compat || Wsafety=)
 Warn when a jump misses a variable initialization.
 
 Enum
@@ -1086,7 +1086,7 @@ C ObjC C++ ObjC++ Warning Var(warn_narrowing) Init(-1) LangEnabledBy(C++ ObjC++,
 Warn about narrowing conversions within { } that are ill-formed in C++11.
 
 Wnested-externs
-C ObjC Var(warn_nested_externs) Warning
+C ObjC Var(warn_nested_externs) Warning LangEnabledBy(C, Wsafety=)
 Warn about \"extern\" declarations not at file scope.
 
 Wnoexcept
@@ -1295,12 +1295,16 @@ Warn when an argument passed to a restrict-qualified parameter aliases with
 another argument.
 
 Wreturn-mismatch
-C ObjC Var(warn_return_mismatch) Warning Init(1)
+C ObjC Var(warn_return_mismatch) Warning LangEnabledBy(C, Wsafety=) Init(1)
 Warn whenever void-returning functions return a non-void expressions, or a return expression is missing in a function not returning void.
 
 Wreturn-type
-C ObjC C++ ObjC++ Var(warn_return_type) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall) Init(-1)
+C ObjC C++ ObjC++ Var(warn_return_type) Warning LangEnabledBy(C ObjC C++ ObjC++,Wall || Wsafety=) Init(-1)
 Warn whenever a function's return type defaults to \"int\" (C), or about inconsistent return types (C++).
+
+Wsafety=
+C Warning Joined UInteger Var(warn_memory_safety) IntegerRange(0, 2)
+Warn about any use of an unsafe construct.
 
 Wscalar-storage-order
 C ObjC C++ ObjC++ Var(warn_scalar_storage_order) Init(1) Warning
@@ -1397,7 +1401,7 @@ C ObjC C++ ObjC++ LangEnabledBy(C ObjC C++ ObjC++,Wall, 1, 0) IntegerRange(0, 5)
 ;
 
 Wstrict-prototypes
-C ObjC Var(warn_strict_prototypes) Warning
+C ObjC Var(warn_strict_prototypes) Warning LangEnabledBy(C ObjC, Wsafety=)
 Warn about unprototyped function declarations.
 
 Wstrict-selector-match
