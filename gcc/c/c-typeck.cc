@@ -3193,6 +3193,51 @@ build_component_ref (location_t loc, tree datum, tree component,
   return error_mark_node;
 }
 
+/* Given an expression PTR for a pointer, determine whether we can
+   safely dereference it.  */
+bool
+known_valid_pointer_p (tree ptr)
+{
+  STRIP_TYPE_NOPS (ptr);
+  tree index = NULL;
+
+  if (TREE_CODE (ptr) == POINTER_PLUS_EXPR)
+    {
+      index = TREE_OPERAND (ptr, 1);
+      ptr = TREE_OPERAND (ptr, 0);
+    }
+
+  if (TREE_CODE (ptr) == PARM_DECL)
+    {
+      tree as = lookup_attribute ("arg spec", DECL_ATTRIBUTES (ptr));
+      if (as)
+	{
+	  as = TREE_VALUE (as);
+	  tree str = TREE_VALUE (as);
+	  const char *s = TREE_STRING_POINTER (str);
+	  if (s != NULL && s[0] == '[' && s[1] == 's')
+	    {
+	       // in dynamic mode, there will be a run-time check
+	       if (warn_memory_safety == 1)
+		 return true;
+
+	       HOST_WIDE_INT i = 0;
+
+	       if (index && TREE_CODE (index) == INTEGER_CST)
+		 i = tree_to_shwi (index);
+
+	       if (ISDIGIT(s[2]))
+		 {
+		    unsigned long u = strtoul(s + 2, NULL, 10);
+		    HOST_WIDE_INT s = tree_to_shwi (TYPE_SIZE_UNIT (TREE_TYPE (ptr)));
+		    return ((0 <= i) && ((unsigned long)i < u * s));      // FIXME overflow
+		 }
+	     }
+	}
+    }
+
+  return false;
+}
 /* Given an expression PTR for a pointer, return an expression
    for the value pointed to.
    ERRORSTRING is the name of the operator to appear in error messages.
@@ -3209,7 +3254,8 @@ build_indirect_ref (location_t loc, tree ptr, ref_operator errstring)
   if (warn_safety_pointer_dereferenciation
       && !c_inhibit_evaluation_warnings
       // for incompletes type we get an error elsewhere
-      && COMPLETE_TYPE_P (TREE_TYPE (type)))
+      && COMPLETE_TYPE_P (TREE_TYPE (type))
+      && !known_valid_pointer_p (ptr))
     warning_at (loc, OPT_Wsafety_pointer_dereferenciation,
 		"Unsafe pointer dereferenciation");
 
