@@ -9,4 +9,12 @@ void f(int *p)
 	p++;		/* { dg-warning "Unsafe pointer arithmetic" } */
 }
 
+void g(int *p)
+{
+	*p;
+	p[0];
+#pragma GCC diagnostic warning "-Wsafety=2"
+	*p;	/* { dg-warning "Unsafe pointer dereferenciation" } */
+	p[0];	/* { dg-warning "Unsafe pointer dereferenciation" } */
+}
 

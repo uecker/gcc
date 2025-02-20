@@ -3206,6 +3206,13 @@ build_indirect_ref (location_t loc, tree ptr, ref_operator errstring)
   tree type = TREE_TYPE (pointer);
   tree ref;
 
+  if (warn_safety_pointer_dereferenciation
+      && !c_inhibit_evaluation_warnings
+      // for incompletes type we get an error elsewhere
+      && COMPLETE_TYPE_P (TREE_TYPE (type)))
+    warning_at (loc, OPT_Wsafety_pointer_dereferenciation,
+		"Unsafe pointer dereferenciation");
+
   if (TREE_CODE (type) == POINTER_TYPE)
     {
       if (CONVERT_EXPR_P (pointer)
