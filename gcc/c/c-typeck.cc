@@ -13714,6 +13714,9 @@ build_binary_op (location_t location, enum tree_code code,
   /* Remember whether we're doing << or >>.  */
   bool doing_shift = false;
 
+  /* Remember wehther we're doing * or + or -.  */
+  bool doing_mul_or_add_or_sub = false;
+
   /* Tree holding instrumentation expression.  */
   tree instrument_expr = NULL;
 
@@ -13903,6 +13906,7 @@ build_binary_op (location_t location, enum tree_code code,
 	}
       else
 	common = 1;
+      doing_mul_or_add_or_sub = true;
       break;
 
     case MINUS_EXPR:
@@ -13923,10 +13927,12 @@ build_binary_op (location_t location, enum tree_code code,
 	}
       else
 	common = 1;
+      doing_mul_or_add_or_sub = true;
       break;
 
     case MULT_EXPR:
       common = 1;
+      doing_mul_or_add_or_sub = true;
       break;
 
     case TRUNC_DIV_EXPR:
@@ -14846,6 +14852,11 @@ build_binary_op (location_t location, enum tree_code code,
 	   && !in_late_binary_op)
     ret = note_integer_operands (ret);
   protected_set_expr_location (ret, location);
+
+  if (warn_safety_signed_arithmetic
+      && (doing_mul_or_add_or_sub || doing_shift || doing_div_or_mod)
+      && !TYPE_UNSIGNED (build_type))
+	warning_at (location, OPT_Wsafety_signed_arithmetic, "Unsafe signed integer operation");
 
   if (instrument_expr != NULL)
     ret = fold_build2 (COMPOUND_EXPR, TREE_TYPE (ret),

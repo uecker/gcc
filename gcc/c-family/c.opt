@@ -1322,6 +1322,10 @@ Wsafety-pointer-dereferenciation
 C Warning Var(warn_safety_pointer_dereferenciation) LangEnabledBy(C, Wsafety=, warn_memory_safety > 1, 0)
 Warn about unsafe pointer dereferenciation
 
+Wsafety-signed-arithmetic
+C Warning Var(warn_safety_signed_arithmetic) LangEnabledBy(C, Wsafety=, warn_memory_safety > 1, 0)
+Warn about unsafe signed arithmetic
+
 Wscalar-storage-order
 C ObjC C++ ObjC++ Var(warn_scalar_storage_order) Init(1) Warning
 Warn on suspicious constructs involving reverse scalar storage order.
