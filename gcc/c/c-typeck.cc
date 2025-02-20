@@ -4607,6 +4607,11 @@ parser_build_binary_op (location_t location, enum tree_code code,
 			   arg1.get_start (),
 			   arg2.get_finish ());
 
+  if (warn_safety_pointer_arithmetic
+      && (POINTER_TYPE_P (type1) || POINTER_TYPE_P (type2))
+      && !(code == EQ_EXPR || code == NE_EXPR))
+    warning_at (location, OPT_Wsafety_pointer_arithmetic, "Unsafe pointer arithmetic");
+
   /* Check for cases such as x+y<<z which users are likely
      to misinterpret.  */
   if (warn_parentheses)
@@ -4779,6 +4784,9 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
   tree target_type = TREE_TYPE (TREE_TYPE (op0));
   tree orig_op0 = op0;
   tree orig_op1 = op1;
+
+  if (warn_safety_pointer_arithmetic)
+    warning_at (loc, OPT_Wsafety_pointer_arithmetic, "Unsafe pointer arithmetic");
 
   /* If the operands point into different address spaces, we need to
      explicitly convert them to pointers into the common address space
@@ -5397,6 +5405,9 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
     case POSTINCREMENT_EXPR:
     case PREDECREMENT_EXPR:
     case POSTDECREMENT_EXPR:
+
+      if (warn_safety_pointer_arithmetic && POINTER_TYPE_P (TREE_TYPE (arg)))
+	warning (OPT_Wsafety_pointer_arithmetic, "Unsafe pointer arithmetic");
 
       if (TREE_CODE (arg) == C_MAYBE_CONST_EXPR)
 	{

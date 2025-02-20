@@ -1310,6 +1310,10 @@ Wsafety-casts
 C Warning Var(warn_safety_casts) LangEnabledBy(C, Wsafety=)
 Warn about unsafe casts
 
+Wsafety-pointer-arithmetic
+C Warning Var(warn_safety_pointer_arithmetic) LangEnabledBy(C, Wsafety=)
+Warn about pointer arithmetic
+
 Wscalar-storage-order
 C ObjC C++ ObjC++ Var(warn_scalar_storage_order) Init(1) Warning
 Warn on suspicious constructs involving reverse scalar storage order.
