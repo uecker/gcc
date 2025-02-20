@@ -3326,6 +3326,18 @@ build_array_ref (location_t loc, tree array, tree index)
   bool was_vector = VECTOR_TYPE_P (TREE_TYPE (array));
   bool non_lvalue = convert_vector_to_array_for_subscript (loc, &array, index);
 
+  if (warn_memory_safety
+      && TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE)  // non array is then in pointer deref.
+    {
+      tree atype = TREE_TYPE (array);
+      if (TREE_CODE (atype) != ARRAY_TYPE
+	  || !TYPE_DOMAIN (atype)
+	  || ((   TREE_CODE (index) == INTEGER_CST
+	       && !int_fits_type_p (index, TYPE_DOMAIN (atype)))
+	      && warn_safety_array_subscription))
+	warning_at (loc, OPT_Wsafety_array_subscription, "Unsafe array subscription");
+    }
+
   if (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE)
     {
       tree rval, type;

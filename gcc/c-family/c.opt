@@ -1306,6 +1306,10 @@ Wsafety=
 C Warning Joined UInteger Var(warn_memory_safety) IntegerRange(0, 2)
 Warn about any use of an unsafe construct.
 
+Wsafety-array-subscription
+C Warning Var(warn_safety_array_subscription) LangEnabledBy(C, Wsafety=)
+Warn about subscription of arrays of unknown length
+
 Wsafety-casts
 C Warning Var(warn_safety_casts) LangEnabledBy(C, Wsafety=)
 Warn about unsafe casts
