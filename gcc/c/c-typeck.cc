@@ -6784,6 +6784,40 @@ build_c_cast (location_t loc, tree type, tree expr)
   if (type == error_mark_node || expr == error_mark_node)
     return error_mark_node;
 
+  if (warn_safety_casts)
+    { // loss of qualifier is detected later
+      // casts to void are ok
+      if (VOID_TYPE_P (type))
+	;
+      else if (TREE_CODE (type) == POINTER_TYPE
+	       && TREE_CODE (TREE_TYPE (expr)) == POINTER_TYPE)
+	{
+	  tree target = TYPE_MAIN_VARIANT (TREE_TYPE (type));
+	  // casts of pointers to void / character pointers are ok
+	  if (!(VOID_TYPE_P (target)
+		|| target == char_type_node
+		|| target == unsigned_char_type_node
+		|| target == signed_char_type_node))
+	    warning_at (loc, OPT_Wsafety_casts, "Unsafe cast");
+	}
+      // casts of integer to unsigned integers are ok
+      else if (TREE_CODE (type) == INTEGER_TYPE
+	       && TYPE_UNSIGNED (type)
+	       && TREE_CODE (TREE_TYPE (expr)) == INTEGER_TYPE)
+	;
+      // casts to integers are ok
+      else if (TREE_CODE (type) == INTEGER_TYPE
+	       && TREE_CODE (TREE_TYPE (expr)) == POINTER_TYPE)
+	;
+      // casts of a null pointer constant is ok in dynamic mode
+      else if (TREE_CODE (type) == POINTER_TYPE
+	       && null_pointer_constant_p (expr)
+	       && warn_memory_safety == 1)
+	;
+      else
+	warning_at (loc, OPT_Wsafety_casts, "Unsafe cast");
+    }
+
   /* The ObjC front-end uses TYPE_MAIN_VARIANT to tie together types differing
      only in <protocol> qualifications.  But when constructing cast expressions,
      the protocols do matter and must be kept around.  */
