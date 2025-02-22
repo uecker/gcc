@@ -5856,6 +5856,21 @@ finish_decl (tree decl, location_t init_loc, tree init,
 
   type = TREE_TYPE (decl);
 
+  if (warn_safety_attributes && DECL_ATTRIBUTES (decl))
+    {
+      tree attr = DECL_ATTRIBUTES (decl);
+      for (; attr != NULL_TREE; attr = TREE_CHAIN (attr))
+	if (!(is_attribute_p ("arg spec", get_attribute_name (attr))
+	      || is_attribute_p ("nothrow", get_attribute_name (attr))
+	      || is_attribute_p ("__alloc_size__", get_attribute_name (attr))
+	      || is_attribute_p ("__alloc_align__", get_attribute_name (attr))
+	      || is_attribute_p ("malloc", get_attribute_name (attr))))
+	  {
+	    warning (OPT_Wsafety_attributes, "Unsafe use of attribute");
+	    break;
+	  }
+     }
+
   /* Deduce size of array from initialization, if not already known.
      This is only needed for an initialization in the current scope;
      it must not be done for a file-scope initialization of a
