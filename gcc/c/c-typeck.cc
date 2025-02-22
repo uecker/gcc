@@ -8325,6 +8325,30 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	    }
 	}
 
+      bool safe_malloc = false;
+
+      /* Warn of new allocations that are not big enough for the target
+	 type.  */
+      if (warn_alloc_size && TREE_CODE (rhs) == CALL_EXPR)
+	if (tree fndecl = get_callee_fndecl (rhs))
+	  if (DECL_IS_MALLOC (fndecl))
+	    {
+	      tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (fndecl));
+	      tree alloc_size = lookup_attribute ("alloc_size", attrs);
+	      if (alloc_size)
+		{
+		  warn_for_alloc_size (location, ttl, rhs, alloc_size);
+		  safe_malloc = true;
+		}
+	    }
+
+      if (warn_safety_conversions
+	  && VOID_TYPE_P (ttr) && !VOID_TYPE_P (ttl)
+	  && !safe_malloc)
+	warning_at (errtype == ic_argpass ? expr_loc : location,
+		    OPT_Wsafety_conversions,
+		    "Unsafe implicit conversion from %qT to %qT",
+		    rhstype, type);
       /* C++ does not allow the implicit conversion void* -> T*.  However,
 	 for the purpose of reducing the number of false positives, we
 	 tolerate the special case of
@@ -8337,18 +8361,6 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 		    OPT_Wc___compat,
 		    "request for implicit conversion "
 		    "from %qT to %qT not permitted in C++", rhstype, type);
-
-      /* Warn of new allocations that are not big enough for the target
-	 type.  */
-      if (warn_alloc_size && TREE_CODE (rhs) == CALL_EXPR)
-	if (tree fndecl = get_callee_fndecl (rhs))
-	  if (DECL_IS_MALLOC (fndecl))
-	    {
-	      tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (fndecl));
-	      tree alloc_size = lookup_attribute ("alloc_size", attrs);
-	      if (alloc_size)
-		warn_for_alloc_size (location, ttl, rhs, alloc_size);
-	    }
 
       /* See if the pointers point to incompatible address spaces.  */
       asl = TYPE_ADDR_SPACE (ttl);
