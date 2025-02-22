@@ -5725,6 +5725,13 @@ build_unary_op (location_t location, enum tree_code code, tree xarg,
 	  goto return_build_unary_op;
 	}
 
+      if (warn_safety_addressof
+	  && TREE_CODE (arg) != STRING_CST
+	  && (!DECL_P (arg)
+	      || (typecode != FUNCTION_TYPE
+		  && !DECL_INITIAL (arg))))
+	warning (OPT_Wsafety_addressof, "Unsafe addressof");
+
       /* Ordinary case; arg is a COMPONENT_REF or a decl, or a call to
 	 .ACCESS_WITH_SIZE.  */
       if (is_access_with_size_p (arg))
