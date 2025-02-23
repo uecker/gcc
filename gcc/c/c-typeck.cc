@@ -3861,6 +3861,13 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   /* Strip NON_LVALUE_EXPRs, etc., since we aren't using as an lvalue.  */
   STRIP_TYPE_NOPS (function);
 
+  if (warn_memory_safety == 2
+      && (TREE_CODE (function) != FUNCTION_DECL
+	  || !prototype_p (TREE_TYPE (function))))
+    { // TODO: CHECK safety
+      warning_at (loc, OPT_Wsafety_, "Unsafe function call");
+    }
+
   /* Convert anything with function type to a pointer-to-function.  */
   if (TREE_CODE (function) == FUNCTION_DECL)
     {

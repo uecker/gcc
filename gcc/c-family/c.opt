@@ -1308,35 +1308,35 @@ Warn about any use of an unsafe construct.
 
 Wsafety-addressof
 C Warning Var(warn_safety_addressof) LangEnabledBy(C, Wsafety=)
-Warn when taking addresses of uninitialized objects
+Warn when taking addresses of uninitialized objects.
 
 Wsafety-array-subscription
 C Warning Var(warn_safety_array_subscription) LangEnabledBy(C, Wsafety=)
-Warn about subscription of arrays of unknown length
+Warn about subscription of arrays of unknown length.
 
 Wsafety-attributes
 C Warning Var(warn_safety_attributes) LangEnabledBy(C, Wsafety=)
-Warn about unsafe use of attributes
+Warn about unsafe use of attributes.
 
 Wsafety-casts
 C Warning Var(warn_safety_casts) LangEnabledBy(C, Wsafety=)
-Warn about unsafe casts
+Warn about unsafe casts.
 
 Wsafety-conversions
 C Warning Var(warn_safety_conversions) LangEnabledBy(C, Wsafety=)
-Warn about unsafe conversions
+Warn about unsafe conversions.
 
 Wsafety-pointer-arithmetic
 C Warning Var(warn_safety_pointer_arithmetic) LangEnabledBy(C, Wsafety=)
-Warn about pointer arithmetic
+Warn about pointer arithmetic.
 
 Wsafety-pointer-dereferenciation
 C Warning Var(warn_safety_pointer_dereferenciation) LangEnabledBy(C, Wsafety=, warn_memory_safety > 1, 0)
-Warn about unsafe pointer dereferenciation
+Warn about unsafe pointer dereferenciation.
 
 Wsafety-signed-arithmetic
 C Warning Var(warn_safety_signed_arithmetic) LangEnabledBy(C, Wsafety=, warn_memory_safety > 1, 0)
-Warn about unsafe signed arithmetic
+Warn about unsafe signed arithmetic.
 
 Wscalar-storage-order
 C ObjC C++ ObjC++ Var(warn_scalar_storage_order) Init(1) Warning

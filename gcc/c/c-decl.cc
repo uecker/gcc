@@ -5856,6 +5856,26 @@ finish_decl (tree decl, location_t init_loc, tree init,
 
   type = TREE_TYPE (decl);
 
+  if (warn_memory_safety > 0)
+    {
+      // actually, we check elsewhere that must return
+      // for dynamic mode, this will be handled by -fsanitize=unreachable
+      if (warn_memory_safety == 2
+	  && FUNCTION_DECL == TREE_CODE (decl)
+	  && TREE_THIS_VOLATILE (decl))
+	warning (OPT_Wsafety_, "Unsafe use of %<_Noreturn%> function");
+
+      if (warn_memory_safety == 2 && C_TYPE_VARIABLY_MODIFIED (type))
+	warning (OPT_Wsafety_, "Unsafe use of variably modified declaration");
+
+      if (UNION_TYPE == TREE_CODE (type))
+	warning (OPT_Wsafety_, "Unsafe use of union");
+
+      if (TYPE_RESTRICT (type))
+	warning (OPT_Wsafety_, "Unsafe use of restrict");
+    }
+
+
   if (warn_safety_attributes && DECL_ATTRIBUTES (decl))
     {
       tree attr = DECL_ATTRIBUTES (decl);
